@@ -4,12 +4,34 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 
+# Function to get Google credentials from Streamlit secrets
+def get_google_creds():
+    google_creds = {
+        "type": st.secrets["gcp_service_account"]["type"],
+        "project_id": st.secrets["gcp_service_account"]["project_id"],
+        "private_key_id": st.secrets["gcp_service_account"]["private_key_id"],
+        "private_key": st.secrets["gcp_service_account"]["private_key"].replace('\\n', '\n'),  # Replace escaped newlines
+        "client_email": st.secrets["gcp_service_account"]["client_email"],
+        "client_id": st.secrets["gcp_service_account"]["client_id"],
+        "auth_uri": st.secrets["gcp_service_account"]["auth_uri"],
+        "token_uri": st.secrets["gcp_service_account"]["token_uri"],
+        "auth_provider_x509_cert_url": st.secrets["gcp_service_account"]["auth_provider_x509_cert_url"],
+        "client_x509_cert_url": st.secrets["gcp_service_account"]["client_x509_cert_url"]
+    }
+    return google_creds
+
+# Function to authorize Google Sheets API using credentials from secrets
+def authorize_google_sheets():
+    creds_dict = get_google_creds()
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+    client = gspread.authorize(creds)
+    return client
+
 # Function to load data from the first Google Sheet with caching to avoid frequent access
 @st.cache_data(ttl=1800)
 def load_data_from_sheet1(sheet_url):
-    scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/drive']
-    creds = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
-    client = gspread.authorize(creds)
+    client = authorize_google_sheets()
     sheet = client.open_by_url(sheet_url).sheet1
     all_values = sheet.get_all_values()
 
@@ -183,8 +205,7 @@ for i, (title, table) in enumerate(zip(st.session_state.titles_sheet1, st.sessio
 
 # Load data from multiple tabs
 def load_data_from_tabs(sheet_url, sheet_name):
-    creds = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
-    client = gspread.authorize(creds)
+    client = authorize_google_sheets()
     sheet = client.open_by_url(sheet_url).worksheet(sheet_name)
     all_values = sheet.get_all_values()
 
